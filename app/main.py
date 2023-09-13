@@ -1,3 +1,4 @@
+import hashlib
 import json
 import sys
 
@@ -38,9 +39,11 @@ def main():
             info = torrent_file.read()
 
         info_dict = bencodepy.Bencode().decode(info)
+        info_hash = hashlib.sha1(bencodepy.encode(info_dict[b"info"]))
 
         print(f'Tracker URL: {info_dict[b"announce"].decode()}')
         print(f'Length: {info_dict[b"info"][b"length"]}')
+        print(f"Info Hash: {info_hash.hexdigest()}")
 
     else:
         raise NotImplementedError(f"Unknown command {command}")
