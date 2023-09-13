@@ -3,8 +3,7 @@ import json
 import sys
 
 import bencodepy
-
-# import requests - available if you need it!
+import requests
 
 bc = bencodepy.Bencode(encoding="utf-8")
 
@@ -49,7 +48,33 @@ def main():
         print("Piece Hashes:")
         for i in range(0, len(info_dict[b"info"][b"pieces"]), 20):
             print(info_dict[b"info"][b"pieces"][i : i + 20].hex())
+    elif command == "peers":
+        with open(sys.argv[2], "rb") as torrent_file:
+            info = torrent_file.read()
 
+        info_dict = bencodepy.Bencode().decode(info)
+        info_hash = hashlib.sha1(bencodepy.encode(info_dict[b"info"]))
+        tracker_url = info_dict[b"announce"].decode()
+
+        response = requests.get(
+            tracker_url,
+            params={
+                "info_hash": info_hash.digest(),
+                "peer_id": "00112233445566778899",
+                "port": 6881,
+                "uploaded": 0,
+                "downloaded": 0,
+                "left": info_dict[b"info"][b"length"],
+                "compact": 1,
+            },
+        )
+
+        decoded_response = bencodepy.Bencode().decode(response.content)
+        peers = decoded_response[b"peers"]
+        for p in range(0, len(peers), 6):
+            ip_address = ".".join([str(i) for i in peers[p : p + 4]])
+            port = int.from_bytes(peers[p + 4 : p + 6], byteorder="big")
+            print(f"{ip_address}:{port}")
     else:
         raise NotImplementedError(f"Unknown command {command}")
 
