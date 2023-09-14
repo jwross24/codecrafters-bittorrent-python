@@ -1,5 +1,6 @@
 import hashlib
 import json
+import socket
 import sys
 
 import bencodepy
@@ -75,6 +76,42 @@ def main():
             ip_address = ".".join([str(i) for i in peers[p : p + 4]])
             port = int.from_bytes(peers[p + 4 : p + 6], byteorder="big")
             print(f"{ip_address}:{port}")
+    elif command == "handshake":
+        with open(sys.argv[2], "rb") as torrent_file:
+            info = torrent_file.read()
+
+        info_dict = bencodepy.Bencode().decode(info)
+        info_hash = hashlib.sha1(bencodepy.encode(info_dict[b"info"]))
+
+        protocol_length = 19
+        protocol_string = b"BitTorrent protocol"
+        reserved_bytes = b"\x00" * 8
+        info_hash = info_hash.digest()
+        peer_id = b"00112233445566778899"
+
+        handshake = (
+            bytes([protocol_length])
+            + protocol_string
+            + reserved_bytes
+            + info_hash
+            + peer_id
+        )
+
+        # Establish TCP connection with peer and send handshake
+        peer_ip_port = sys.argv[3]
+        peer_ip = peer_ip_port.split(":")[0]
+        peer_port = int(peer_ip_port.split(":")[1])
+
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect((peer_ip, peer_port))
+        sock.sendall(handshake)
+
+        # Receive handshake from peer
+        received_handshake = sock.recv(68)
+        sock.close()
+
+        received_peer_id = received_handshake[48:]
+        print(f"Peer ID: {received_peer_id.hex()}")
     else:
         raise NotImplementedError(f"Unknown command {command}")
 
